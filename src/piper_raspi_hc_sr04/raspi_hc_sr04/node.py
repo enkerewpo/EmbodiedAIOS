@@ -84,8 +84,8 @@ class HCSR04Node(Node):
                     f"published distance for {sensor_name}: {distance:.6f} cm, range: {msg.range:.6f} m"
                 )
             else:
-                self.get_logger().warn(
-                    f"failed to get distance measurement for {sensor_name}"
+                self.get_logger().info(
+                    f"device not connected or result too small/too large for {sensor_name}, ignoring!"
                 )
 
     def cleanup(self):

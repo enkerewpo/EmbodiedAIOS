@@ -27,34 +27,57 @@ class HCSR04Driver:
         gpio.setup(self.trig_pin, gpio.OUT)
         gpio.setup(self.echo_pin, gpio.IN)
 
-    def get_distance(self) -> Optional[float]:
-        try:            
+    def get_distance(self, timeout: float = 0.05) -> Optional[float]:
+        """
+        Get distance measurement from the sensor with timeout protection.
+        Optimized for real-time collision prevention.
+
+        Args:
+            timeout (float): Maximum time to wait for echo signal in seconds (default: 0.05s)
+
+        Returns:
+            Optional[float]: Distance in cm, or None if measurement failed
+        """
+        try:
+            # Send trigger signal - minimize delays
             gpio.output(self.trig_pin, False)
-            time.sleep(0.1)
+            time.sleep(0.0001)  # Reduced from 0.1s to 0.0001s
             gpio.output(self.trig_pin, True)
             time.sleep(0.00001)
             gpio.output(self.trig_pin, False)
 
+            # Wait for echo start with timeout
+            start_time = time.time()
             while gpio.input(self.echo_pin) == 0:
-                pulse_start = time.time()
+                if time.time() - start_time > timeout:
+                    return None
+                # Remove sleep to improve responsiveness
+            
+            pulse_start = time.time()
 
+            # Wait for echo end with timeout
             while gpio.input(self.echo_pin) == 1:
-                pulse_end = time.time()
-
+                if time.time() - start_time > timeout:
+                    return None
+                # Remove sleep to improve responsiveness
+            
+            pulse_end = time.time()
             pulse_duration = pulse_end - pulse_start
 
-            if pulse_duration >= 0.01746:
+            # Quick validation
+            if pulse_duration >= 0.01746 or pulse_duration <= 0.00001:
                 return None
 
             distance = pulse_duration * 17000
 
-            if distance > 300 or distance == 0:
+            # Adjust range check for collision prevention
+            if distance > 400 or distance < 2:  # Extended range for better detection
                 return None
 
-            return round(distance, 3)
+            return round(distance, 1)  # Reduced precision for faster processing
 
         except Exception as e:
-            print(f"error getting distance: {e}")
+            print(f"Error getting distance: {e}")
             return None
 
 
@@ -69,7 +92,7 @@ class MultiHCSR04Driver:
                     config = yaml.safe_load(f)
                     sensor_configs = config["sensors"]
                     print(
-                        f"successfully loaded sensor configurations from {config_path}"
+                        f"su ccessfully loaded sensor configurations from {config_path}"
                     )
             except Exception as e:
                 print(f"failed to load sensor configurations: {str(e)}")
@@ -121,7 +144,7 @@ def main():
                     print(f"{sensor_name}: measurement failed")
                 else:
                     print(f"{sensor_name}: {distance} cm")
-            time.sleep(0.1)
+            time.sleep(0.05)  # Reduced from 0.1s to 0.05s for faster updates
 
     except Exception as e:
         print(f"error: {e}")
